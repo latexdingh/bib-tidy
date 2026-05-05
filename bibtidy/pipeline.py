@@ -1,50 +1,69 @@
-"""High-level pipeline: parse → enrich → deduplicate → normalize keys → format."""
+"""End-to-end pipeline for bib-tidy.
 
+Orchestrates parsing, deduplication, DOI enrichment, key normalization,
+field filtering, journal abbreviation, sorting, and formatting.
+"""
+
+from pathlib import Path
 from typing import Optional
 
 from bibtidy.parser import parse_bibliography
 from bibtidy.formatter import format_bibliography
+from bibtidy.deduplicator import deduplicate
 from bibtidy.doi_resolver import enrich_entry
 from bibtidy.key_normalizer import normalize_key
-from bibtidy.deduplicator import deduplicate
+from bibtidy.field_filter import filter_bibliography
+from bibtidy.sorter import sort_entries
+from bibtidy.abbreviator import abbreviate_bibliography
 
 
 def run(
-    bibtex_input: str,
-    resolve_dois: bool = True,
-    dedup: bool = True,
+    source: str,
+    *,
+    sort_field: Optional[str] = "year",
+    sort_reverse: bool = False,
+    keep_fields: Optional[list[str]] = None,
+    drop_fields: Optional[list[str]] = None,
+    resolve_doi: bool = False,
     normalize_keys: bool = True,
-    title_threshold: float = 0.85,
+    abbreviate_journals: bool = False,
+    abbreviations: Optional[dict[str, str]] = None,
 ) -> str:
-    """Run the full bib-tidy pipeline on a BibTeX string.
+    """Run the full bib-tidy pipeline on *source* BibTeX text.
 
-    Args:
-        bibtex_input: Raw BibTeX source text.
-        resolve_dois: Whether to fetch missing metadata via DOI lookup.
-        dedup: Whether to remove duplicate entries.
-        normalize_keys: Whether to regenerate citation keys.
-        title_threshold: Similarity threshold used for title-based deduplication.
-
-    Returns:
-        Formatted, cleaned BibTeX string.
+    Returns formatted BibTeX as a string.
     """
-    entries = parse_bibliography(bibtex_input)
+    entries = parse_bibliography(source)
 
-    if resolve_dois:
+    # Deduplicate
+    entries = deduplicate(entries)
+
+    # Optionally resolve DOIs
+    if resolve_doi:
         enriched = []
         for entry in entries:
             try:
                 enriched.append(enrich_entry(entry))
             except Exception:
-                # Network errors or bad DOIs should not abort the pipeline.
                 enriched.append(entry)
         entries = enriched
 
-    if dedup:
-        entries = deduplicate(entries, title_threshold=title_threshold)
-
+    # Normalize citation keys
     if normalize_keys:
-        entries = [normalize_key(entry) for entry in entries]
+        entries = [normalize_key(e) for e in entries]
+
+    # Filter fields
+    entries = filter_bibliography(
+        entries, keep=keep_fields or [], drop=drop_fields or []
+    )
+
+    # Abbreviate journal names
+    if abbreviate_journals:
+        entries = abbreviate_bibliography(entries, abbreviations=abbreviations)
+
+    # Sort
+    if sort_field:
+        entries = sort_entries(entries, field=sort_field, reverse=sort_reverse)
 
     return format_bibliography(entries)
 
@@ -54,23 +73,12 @@ def run_file(
     output_path: Optional[str] = None,
     **kwargs,
 ) -> str:
-    """Read a .bib file, process it, and optionally write the result.
+    """Run the pipeline on a BibTeX file.
 
-    Args:
-        input_path: Path to the input .bib file.
-        output_path: If provided, write the result to this path.
-        **kwargs: Forwarded to :func:`run`.
-
-    Returns:
-        Formatted BibTeX string.
+    If *output_path* is given, writes the result there as well as returning it.
     """
-    with open(input_path, 'r', encoding='utf-8') as fh:
-        raw = fh.read()
-
-    result = run(raw, **kwargs)
-
+    source = Path(input_path).read_text(encoding="utf-8")
+    result = run(source, **kwargs)
     if output_path:
-        with open(output_path, 'w', encoding='utf-8') as fh:
-            fh.write(result)
-
+        Path(output_path).write_text(result, encoding="utf-8")
     return result
