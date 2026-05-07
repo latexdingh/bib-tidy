@@ -104,15 +104,33 @@ def test_entry_other_fields_preserved():
 # normalize_bibliography_months
 # ---------------------------------------------------------------------------
 
-def test_bibliography_normalizes_all_entries():
+def test_bibliography_months_normalizes_all_entries():
     bib = [
-        _entry(month="January"),
-        _entry(month="12"),
-        _entry(month="aug"),
+        _entry(month="January", key="A"),
+        _entry(month="12", key="B"),
+        _entry(month="aug", key="C"),
     ]
     result = normalize_bibliography_months(bib)
-    assert [e["fields"]["month"] for e in result] == ["jan", "dec", "aug"]
+    assert result[0]["fields"]["month"] == "jan"
+    assert result[1]["fields"]["month"] == "dec"
+    assert result[2]["fields"]["month"] == "aug"
 
 
-def test_bibliography_empty_list():
+def test_bibliography_months_skips_entries_without_month():
+    bib = [
+        _entry(title="No month here"),
+        _entry(month="March"),
+    ]
+    result = normalize_bibliography_months(bib)
+    assert "month" not in result[0]["fields"]
+    assert result[1]["fields"]["month"] == "mar"
+
+
+def test_bibliography_months_empty_list():
     assert normalize_bibliography_months([]) == []
+
+
+def test_bibliography_months_returns_new_list():
+    bib = [_entry(month="July")]
+    result = normalize_bibliography_months(bib)
+    assert result is not bib
