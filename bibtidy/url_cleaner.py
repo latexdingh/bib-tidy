@@ -1,5 +1,4 @@
-"""
-url_cleaner.py — Normalize and clean URL fields in BibTeX entries.
+"""url_cleaner.py — Normalize and clean URL fields in BibTeX entries.
 
 Removes tracking parameters, normalizes schemes, and optionally strips
 redundant URL fields when a DOI is already present.
@@ -40,14 +39,41 @@ def clean_url(url: str) -> str:
     return urlunparse(parsed)
 
 
+def is_doi_url(url: str) -> bool:
+    """Return True if the URL is a DOI resolver link (doi.org or dx.doi.org).
+
+    This is useful for detecting when a URL field is redundant because it
+    simply encodes the same information as a DOI field.
+
+    >>> is_doi_url("https://doi.org/10.1000/xyz")
+    True
+    >>> is_doi_url("https://example.com/paper")
+    False
+    """
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        host = urlparse(url.strip()).netloc.lower()
+    except ValueError:
+        return False
+    return host in ("doi.org", "dx.doi.org", "www.doi.org")
+
+
 def should_drop_url(entry: dict, drop_if_doi: bool = True) -> bool:
-    """Return True if the URL field should be removed from the entry."""
+    """Return True if the URL field should be removed from the entry.
+
+    Drops the URL when *both* conditions hold:
+    - ``drop_if_doi`` is True
+    - The entry has a non-empty DOI field **or** the URL is itself a DOI
+      resolver link (making it fully redundant).
+    """
     if not drop_if_doi:
         return False
     fields = entry.get("fields", {})
     has_doi = bool(fields.get("doi", "").strip())
-    has_url = bool(fields.get("url", "").strip())
-    return has_doi and has_url
+    url = fields.get("url", "").strip()
+    has_url = bool(url)
+    return has_url and (has_doi or is_doi_url(url))
 
 
 def clean_entry_url(entry: dict, drop_if_doi: bool = False) -> dict:
