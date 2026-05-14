@@ -1,6 +1,4 @@
-"""
-Tests for bibtidy.address_normalizer.
-"""
+"""Tests for bibtidy.address_normalizer."""
 
 import pytest
 from bibtidy.address_normalizer import (
@@ -100,16 +98,22 @@ def test_normalize_entry_address_does_not_mutate_original():
 # ---------------------------------------------------------------------------
 
 def test_normalize_bibliography_addresses_processes_all_entries():
-    bib = [
-        _entry(address="London"),
-        _entry(address="Paris"),
-        _entry(address=""),
+    entries = [
+        _entry(address="Berlin"),
+        _entry(address="paris"),
+        _entry(address="NYC"),
     ]
-    result = normalize_bibliography_addresses(bib)
-    assert result[0]["fields"]["address"] == "London, UK"
-    assert result[1]["fields"]["address"] == "Paris, France"
-    assert "address" not in result[2]["fields"]
+    results = normalize_bibliography_addresses(entries)
+    assert results[0]["fields"]["address"] == "Berlin, Germany"
+    assert results[1]["fields"]["address"] == "Paris, France"
+    assert results[2]["fields"]["address"] == "New York, NY"
 
 
 def test_normalize_bibliography_addresses_empty_list():
     assert normalize_bibliography_addresses([]) == []
+
+
+def test_normalize_bibliography_addresses_does_not_mutate_originals():
+    entries = [_entry(address="London")]
+    _ = normalize_bibliography_addresses(entries)
+    assert entries[0]["fields"]["address"] == "London"
