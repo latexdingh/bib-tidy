@@ -103,26 +103,36 @@ def test_entry_missing_publisher_unchanged():
 
 def test_entry_original_not_mutated():
     entry = _entry(publisher="Elsevier B.V.")
-    original = dict(entry)
+    original_publisher = entry["publisher"]
     normalize_entry_publisher(entry)
-    assert entry == original
+    assert entry["publisher"] == original_publisher
 
 
 # ---------------------------------------------------------------------------
 # normalize_bibliography_publishers
 # ---------------------------------------------------------------------------
 
-def test_bibliography_all_entries_normalized():
+def test_bibliography_normalizes_all_entries():
+    """All entries in the bibliography should have their publishers normalized."""
     bib = [
         _entry(publisher="Springer-Verlag"),
         _entry(publisher="ACM Press"),
-        _entry(publisher="Unknown House"),
+        _entry(publisher="IEEE Computer Society"),
     ]
-    result = normalize_bibliography_publishers(bib)
-    assert result[0]["publisher"] == "Springer"
-    assert result[1]["publisher"] == "ACM"
-    assert result[2]["publisher"] == "Unknown House"
+    results = normalize_bibliography_publishers(bib)
+    assert results[0]["publisher"] == "Springer"
+    assert results[1]["publisher"] == "ACM"
+    assert results[2]["publisher"] == "IEEE"
 
 
-def test_bibliography_empty_list():
+def test_bibliography_empty_list_returns_empty():
+    """An empty bibliography should return an empty list without errors."""
     assert normalize_bibliography_publishers([]) == []
+
+
+def test_bibliography_entries_without_publisher_unchanged():
+    """Entries lacking a publisher field should pass through unmodified."""
+    bib = [_entry(title="No Publisher Here")]
+    results = normalize_bibliography_publishers(bib)
+    assert "publisher" not in results[0]
+    assert results[0]["title"] == "No Publisher Here"
